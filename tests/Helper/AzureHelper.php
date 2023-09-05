@@ -21,13 +21,14 @@ class AzureHelper
     /** @var KeysFaker */
     private $keysFaker;
 
-
     /** @var string */
     private $defaultClientId;
 
-
     /** @var string */
     private $defaultIss;
+
+    /** @var string */
+    private $defaultTenantId;
 
     /** @var string */
     private $defaultAuthEndpoint;
@@ -42,6 +43,7 @@ class AzureHelper
 
         $this->defaultClientId = 'client_id';
         $this->defaultIss = 'iss';
+        $this->defaultTenantId = 'tenant_id';
         $this->defaultAuthEndpoint = 'auth_endpoint';
         $this->defaultLogoutUrl = 'logout_url';
     }
@@ -132,6 +134,14 @@ class AzureHelper
     public function getDefaultIss(): string
     {
         return $this->defaultIss;
+    }
+
+    /**
+     * @return string
+     */
+    public function getDefaultTenantId(): string
+    {
+        return $this->defaultTenantId;
     }
 
     /**

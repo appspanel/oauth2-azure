@@ -38,12 +38,13 @@ class B2cTokenFaker
      * @param bool $isSuccessful
      */
     public function setFakeData(
-        string $b2cId,
-        bool   $isSuccessful,
-        string $clientId,
-        string $issuer,
-        ?int   $expires = null,
-        ?int   $notBefore = null
+        string  $b2cId,
+        bool    $isSuccessful,
+        string  $clientId,
+        string  $issuer,
+        ?string $tenantId = null,
+        ?int    $expires = null,
+        ?int    $notBefore = null
     ): void
     {
         $this->fakeData = [
@@ -53,6 +54,7 @@ class B2cTokenFaker
             'iss' => $issuer,
             'exp' => $expires ?? time() + 3600, // expires in one hour
             'nbf' => $notBefore ?? time(),
+            'tid' => $tenantId,
         ];
     }
 
@@ -75,7 +77,8 @@ class B2cTokenFaker
               'sub' => $this->fakeData['sub'],
               'tfp' => 'tfp',
               'ver' => '1.0',
-              'iat' => time()
+              'iat' => time(),
+              'tid' => $this->fakeData['tid'],
             );
 
             $idToken = array(
@@ -86,6 +89,7 @@ class B2cTokenFaker
                 "sub" => $this->fakeData['sub'],
                 "aud" => $this->fakeData['aud'],
                 "iat" => time(),
+                "tid" => $this->fakeData['tid'],
                 "auth_time" => time(),
                 "idp_access_token" => '123',
                 "idp" => "idp",

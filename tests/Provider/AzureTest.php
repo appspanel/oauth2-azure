@@ -121,7 +121,7 @@ class AzureTest extends TestCase
         // This test is not working as expected. The exception is thrown in firebase/php-jwt/src/JWT.php:163 instead of Azure.php:357
         $this->expectException(RuntimeException::class);
 
-        $this->helper->getTokenFaker()->setFakeData('b2cId', true, $this->helper->getDefaultClientId(), $this->helper->getDefaultIss(), time() - 99);
+        $this->helper->getTokenFaker()->setFakeData('b2cId', true, $this->helper->getDefaultClientId(), $this->helper->getDefaultIss(), $this->helper->getDefaultTenantId(), time() - 99);
         $this->azure = new Azure([], ['httpClient' => $this->helper->getMockHttpClient(false)]);
 
         $this->helper->getAccessToken($this->azure);
@@ -135,7 +135,7 @@ class AzureTest extends TestCase
         // This test is not working as expected. The exception is thrown in firebase/php-jwt/src/JWT.php:147 instead of Azure.php:357
         $this->expectException(RuntimeException::class);
 
-        $this->helper->getTokenFaker()->setFakeData('b2cId', true, $this->helper->getDefaultClientId(), $this->helper->getDefaultIss(), null, time() + 99);
+        $this->helper->getTokenFaker()->setFakeData('b2cId', true, $this->helper->getDefaultClientId(), $this->helper->getDefaultIss(), $this->helper->getDefaultTenantId(), null, time() + 99);
         $this->azure = new Azure([], ['httpClient' => $this->helper->getMockHttpClient(false)]);
 
         $this->helper->getAccessToken($this->azure);
@@ -148,7 +148,7 @@ class AzureTest extends TestCase
     {
         $this->expectException(RuntimeException::class);
 
-        $this->helper->getTokenFaker()->setFakeData('b2cId', true, $this->helper->getDefaultClientId(), 'invalid_issuer');
+        $this->helper->getTokenFaker()->setFakeData('b2cId', true, $this->helper->getDefaultClientId(), 'invalid_issuer', $this->helper->getDefaultTenantId());
         $this->azure = new Azure([], ['httpClient' => $this->helper->getMockHttpClient(false)]);
 
         $this->helper->getAccessToken($this->azure);
