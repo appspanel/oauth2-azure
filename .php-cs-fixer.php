@@ -3,7 +3,8 @@
 $finder = PhpCsFixer\Finder::create()
     ->in(__DIR__ . '/src');
 
-return PhpCsFixer\Config::create()
+$config = new PhpCsFixer\Config();
+return $config
     ->setRiskyAllowed(true)
     ->setUsingCache(false)
     ->setRules([
@@ -18,14 +19,15 @@ return PhpCsFixer\Config::create()
         'general_phpdoc_annotation_remove'          => ['annotations' => ['author', 'package', 'subpackage']],
         'declare_equal_normalize'                   => ['space' => 'single'],
         'dir_constant'                              => true,
+        'echo_tag_syntax'                           => ['format' => 'long'],
         'fully_qualified_strict_types'              => true,
         'function_typehint_space'                   => true,
         'heredoc_to_nowdoc'                         => true,
         'include'                                   => true,
-        'is_null'                                   => ['use_yoda_style' => true],
         'linebreak_after_opening_tag'               => true,
         'lowercase_cast'                            => true,
         'modernize_types_casting'                   => true,
+        'multiline_whitespace_before_semicolons'    => ['strategy' => 'no_multi_line'],
         'new_with_braces'                           => true,
         'no_alias_functions'                        => true,
         'no_alternative_syntax'                     => true,
@@ -36,10 +38,8 @@ return PhpCsFixer\Config::create()
         'no_leading_import_slash'                   => true,
         'no_leading_namespace_whitespace'           => true,
         'no_mixed_echo_print'                       => ['use' => 'echo'],
-        'no_multiline_whitespace_before_semicolons' => true,
         'no_null_property_initialization'           => true,
         'no_php4_constructor'                       => true,
-        'no_short_echo_tag'                         => false,
         'no_unreachable_default_argument_value'     => true,
         'no_useless_else'                           => true,
         'no_useless_return'                         => true,
@@ -62,7 +62,7 @@ return PhpCsFixer\Config::create()
         'single_quote'                              => ['strings_containing_single_quote_chars' => true],
         'standardize_increment'                     => true,
         'standardize_not_equals'                    => true,
-        'trailing_comma_in_multiline_array'         => true,
+        'trailing_comma_in_multiline'               => ['elements' => ['arrays']],
         'trim_array_spaces'                         => true,
         'whitespace_after_comma_in_array'           => true,
         'yoda_style'                                => true,
