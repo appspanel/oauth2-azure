@@ -2,8 +2,8 @@
 
 namespace TheNetworg\OAuth2\Client\Provider;
 
-use Firebase\JWT\JWT;
 use Firebase\JWT\JWK;
+use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use League\OAuth2\Client\Grant\AbstractGrant;
 use League\OAuth2\Client\Provider\AbstractProvider;
@@ -18,22 +18,25 @@ use TheNetworg\OAuth2\Client\Token\AccessToken;
 
 class Azure extends AbstractProvider
 {
-    const ENDPOINT_VERSION_1_0 = '1.0';
-    const ENDPOINT_VERSION_2_0 = '2.0';
-    const ENDPOINT_VERSIONS = [self::ENDPOINT_VERSION_1_0, self::ENDPOINT_VERSION_2_0];
-
     use BearerAuthorizationTrait;
 
-    public $urlLogin = 'https://login.microsoftonline.com/';
+    const ENDPOINT_VERSION_1_0 = '1.0';
 
-    /** @var array|null */
-    protected $openIdConfiguration;
+    const ENDPOINT_VERSION_2_0 = '2.0';
+
+    const ENDPOINT_VERSIONS = [self::ENDPOINT_VERSION_1_0, self::ENDPOINT_VERSION_2_0];
+
+    public $urlLogin = 'https://login.microsoftonline.com/';
 
     public $scope = [];
 
     public $scopeSeparator = ' ';
 
     public $tenant = 'common';
+
+    public $prefix;
+
+    public $policy;
 
     public $defaultEndPointVersion = self::ENDPOINT_VERSION_1_0;
 
@@ -45,7 +48,10 @@ class Azure extends AbstractProvider
 
     public $authWithResource = true;
 
-    public $defaultAlgorithm = null;
+    public $defaultAlgorithm;
+
+    /** @var array|null */
+    protected $openIdConfiguration;
 
     /**
      * The contents of the private key used for app authentication
@@ -65,42 +71,13 @@ class Azure extends AbstractProvider
         if (isset($options['scopes'])) {
             $this->scope = array_merge($options['scopes'], $this->scope);
         }
-        if (isset($options['defaultEndPointVersion']) &&
-            in_array($options['defaultEndPointVersion'], self::ENDPOINT_VERSIONS, true)) {
+        if (isset($options['defaultEndPointVersion']) && in_array($options['defaultEndPointVersion'], self::ENDPOINT_VERSIONS, true)) {
             $this->defaultEndPointVersion = $options['defaultEndPointVersion'];
         }
         if (isset($options['defaultAlgorithm'])) {
             $this->defaultAlgorithm = $options['defaultAlgorithm'];
         }
         $this->grantFactory->setGrant('jwt_bearer', new JwtBearer());
-    }
-
-    /**
-     * @param string $tenant
-     * @param string $version
-     */
-    protected function getOpenIdConfiguration($tenant, $version) {
-        if (!is_array($this->openIdConfiguration)) {
-            $this->openIdConfiguration = [];
-        }
-        if (!array_key_exists($tenant, $this->openIdConfiguration)) {
-            $this->openIdConfiguration[$tenant] = [];
-        }
-        if (!array_key_exists($version, $this->openIdConfiguration[$tenant])) {
-            $versionInfix = $this->getVersionUriInfix($version);
-	          $openIdConfigurationUri = $this->urlLogin . $tenant . $versionInfix . '/.well-known/openid-configuration?appid=' . $this->clientId;
-            
-            $factory = $this->getRequestFactory();
-            $request = $factory->getRequestWithOptions(
-                'get',
-                $openIdConfigurationUri,
-                []
-            );
-            $response = $this->getParsedResponse($request);
-            $this->openIdConfiguration[$tenant][$version] = $response;
-        }
-
-        return $this->openIdConfiguration[$tenant][$version];
     }
 
     /**
@@ -121,38 +98,12 @@ class Azure extends AbstractProvider
         return $openIdConfiguration['token_endpoint'];
     }
 
-    protected function getAccessTokenRequest(array $params): RequestInterface
-    {
-      if ($this->clientCertificatePrivateKey && $this->clientCertificateThumbprint) {
-        $header = [
-          'x5t' => base64_encode(hex2bin($this->clientCertificateThumbprint)),
-        ];
-        $now = time();
-        $payload = [
-          'aud' => "https://login.microsoftonline.com/{$this->tenant}/oauth2/v2.0/token",
-          'exp' => $now + 360,
-          'iat' => $now,
-          'iss' => $this->clientId,
-          'jti' => bin2hex(random_bytes(20)),
-          'nbf' => $now,
-          'sub' => $this->clientId,
-        ];
-        $jwt = JWT::encode($payload, str_replace('\n', "\n", $this->clientCertificatePrivateKey), 'RS256', null, $header);
-
-        unset($params['client_secret']);
-        $params['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
-        $params['client_assertion'] = $jwt;
-      }
-
-      return parent::getAccessTokenRequest($params);
-    }
-
     /**
      * @inheritdoc
      */
     public function getAccessToken($grant, array $options = []): AccessTokenInterface
     {
-        if ($this->defaultEndPointVersion != self::ENDPOINT_VERSION_2_0) {
+        if (self::ENDPOINT_VERSION_2_0 != $this->defaultEndPointVersion) {
             // Version 2.0 does not support the resources parameter
             // https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow
             // while version 1.0 does recommend it
@@ -218,12 +169,12 @@ class Azure extends AbstractProvider
     public function getRootMicrosoftGraphUri($accessToken)
     {
         if (is_null($accessToken)) {
-            $tenant = $this->tenant;
+            $tenant  = $this->tenant;
             $version = $this->defaultEndPointVersion;
         } else {
             $idTokenClaims = $accessToken->getIdTokenClaims();
-            $tenant = is_array($idTokenClaims) && array_key_exists('tid', $idTokenClaims) ? $idTokenClaims['tid'] : $this->tenant;
-            $version = is_array($idTokenClaims) && array_key_exists('ver', $idTokenClaims) ? $idTokenClaims['ver'] : $this->defaultEndPointVersion;
+            $tenant        = is_array($idTokenClaims) && array_key_exists('tid', $idTokenClaims) ? $idTokenClaims['tid'] : $this->tenant;
+            $version       = is_array($idTokenClaims) && array_key_exists('ver', $idTokenClaims) ? $idTokenClaims['ver'] : $this->defaultEndPointVersion;
         }
         $openIdConfiguration = $this->getOpenIdConfiguration($tenant, $version);
         return 'https://' . $openIdConfiguration['msgraph_host'];
@@ -317,10 +268,10 @@ class Azure extends AbstractProvider
      *
      * @return string
      */
-    public function getLogoutUrl($post_logout_redirect_uri = "")
+    public function getLogoutUrl($post_logout_redirect_uri = '')
     {
         $openIdConfiguration = $this->getOpenIdConfiguration($this->tenant, $this->defaultEndPointVersion);
-        $logoutUri = $openIdConfiguration['end_session_endpoint'];
+        $logoutUri           = $openIdConfiguration['end_session_endpoint'];
 
         if (!empty($post_logout_redirect_uri)) {
             $logoutUri .= '?post_logout_redirect_uri=' . rawurlencode($post_logout_redirect_uri);
@@ -353,7 +304,8 @@ class Azure extends AbstractProvider
      *
      * @return void
      */
-    public function validateTokenClaims($tokenClaims) {
+    public function validateTokenClaims($tokenClaims)
+    {
         if ($this->getClientId() != $tokenClaims['aud']) {
             throw new \RuntimeException('The client_id / audience is invalid!');
         }
@@ -367,7 +319,7 @@ class Azure extends AbstractProvider
         }
 
         $version = array_key_exists('ver', $tokenClaims) ? $tokenClaims['ver'] : $this->defaultEndPointVersion;
-        $tenant = $this->getTenantDetails($this->tenant, $version);
+        $tenant  = $this->getTenantDetails($this->tenant, $version);
         if ($tokenClaims['iss'] != $tenant['issuer']) {
             throw new \RuntimeException('Invalid token issuer (tokenClaims[iss]' . $tokenClaims['iss'] . ', tenant[issuer] ' . $tenant['issuer'] . ')!');
         }
@@ -381,7 +333,7 @@ class Azure extends AbstractProvider
     public function getJwtVerificationKeys()
     {
         $openIdConfiguration = $this->getOpenIdConfiguration($this->tenant, $this->defaultEndPointVersion);
-        $keysUri = $openIdConfiguration['jwks_uri'];
+        $keysUri             = $openIdConfiguration['jwks_uri'];
 
         $factory = $this->getRequestFactory();
         $request = $factory->getRequestWithOptions('get', $keysUri, []);
@@ -392,26 +344,25 @@ class Azure extends AbstractProvider
         foreach ($response['keys'] as $i => $keyinfo) {
             if (isset($keyinfo['x5c']) && is_array($keyinfo['x5c'])) {
                 foreach ($keyinfo['x5c'] as $encodedkey) {
-                    $cert =
-                        '-----BEGIN CERTIFICATE-----' . PHP_EOL
-                        . chunk_split($encodedkey, 64,  PHP_EOL)
+                    $cert = '-----BEGIN CERTIFICATE-----' . PHP_EOL
+                        . chunk_split($encodedkey, 64, PHP_EOL)
                         . '-----END CERTIFICATE-----' . PHP_EOL;
 
                     $cert_object = openssl_x509_read($cert);
 
-                    if ($cert_object === false) {
+                    if (false === $cert_object) {
                         throw new \RuntimeException('An attempt to read ' . $encodedkey . ' as a certificate failed.');
                     }
 
                     $pkey_object = openssl_pkey_get_public($cert_object);
 
-                    if ($pkey_object === false) {
+                    if (false === $pkey_object) {
                         throw new \RuntimeException('An attempt to read a public key from a ' . $encodedkey . ' certificate failed.');
                     }
 
                     $pkey_array = openssl_pkey_get_details($pkey_object);
 
-                    if ($pkey_array === false) {
+                    if (false === $pkey_array) {
                         throw new \RuntimeException('An attempt to get a public key as an array from a ' . $encodedkey . ' certificate failed.');
                     }
 
@@ -419,34 +370,26 @@ class Azure extends AbstractProvider
 
                     $keys[$keyinfo['kid']] = new Key($publicKey, 'RS256');
                 }
-            } else if (isset($keyinfo['n']) && isset($keyinfo['e'])) {
+            } elseif (isset($keyinfo['n'], $keyinfo['e'])) {
                 $pkey_object = JWK::parseKey($keyinfo, $this->defaultAlgorithm);
 
-                if ($pkey_object === false) {
+                if (false === $pkey_object) {
                     throw new \RuntimeException('An attempt to read a public key from a ' . $keyinfo['n'] . ' certificate failed.');
                 }
 
                 $pkey_array = openssl_pkey_get_details($pkey_object->getKeyMaterial());
 
-                if ($pkey_array === false) {
+                if (false === $pkey_array) {
                     throw new \RuntimeException('An attempt to get a public key as an array from a ' . $keyinfo['n'] . ' certificate failed.');
                 }
 
                 $publicKey = $pkey_array ['key'];
 
-               $keys[$keyinfo['kid']] = new Key($publicKey, 'RS256');;
+                $keys[$keyinfo['kid']] = new Key($publicKey, 'RS256');
             }
         }
 
         return $keys;
-    }
-
-    protected function getVersionUriInfix($version)
-    {
-        return
-            ($version == self::ENDPOINT_VERSION_2_0)
-                ? '/v' . self::ENDPOINT_VERSION_2_0
-                : '';
     }
 
     /**
@@ -455,12 +398,81 @@ class Azure extends AbstractProvider
      * @param string $tenant
      * @param string|null $version
      *
-     * @return array
      * @throws IdentityProviderException
+     * @return array
      */
     public function getTenantDetails($tenant, $version)
     {
         return $this->getOpenIdConfiguration($this->tenant, $this->defaultEndPointVersion);
+    }
+
+    /**
+     * @param string $tenant
+     * @param string $version
+     */
+    protected function getOpenIdConfiguration($tenant, $version)
+    {
+        if (!is_array($this->openIdConfiguration)) {
+            $this->openIdConfiguration = [];
+        }
+        if (!array_key_exists($tenant, $this->openIdConfiguration)) {
+            $this->openIdConfiguration[$tenant] = [];
+        }
+        if (!array_key_exists($version, $this->openIdConfiguration[$tenant])) {
+            if (null !== $this->prefix && null !== $this->policy) {
+                $openIdConfigurationUri = 'https://' . $this->prefix . '.b2clogin.com/' . $this->prefix . '.onmicrosoft.com/' . $this->policy . '/v2.0/.well-known/openid-configuration';
+            } elseif (null !== $this->prefix) {
+                $openIdConfigurationUri = 'https://' . $this->prefix . '.b2clogin.com/' . $this->prefix . '.onmicrosoft.com/v2.0/.well-known/openid-configuration';
+            } else {
+                $versionInfix           = $this->getVersionUriInfix($version);
+                $openIdConfigurationUri = $this->urlLogin . $tenant . $versionInfix . '/.well-known/openid-configuration?appid=' . $this->clientId;
+            }
+
+            $factory = $this->getRequestFactory();
+            $request = $factory->getRequestWithOptions(
+                'get',
+                $openIdConfigurationUri,
+                []
+            );
+            $response                                     = $this->getParsedResponse($request);
+            $this->openIdConfiguration[$tenant][$version] = $response;
+        }
+
+        return $this->openIdConfiguration[$tenant][$version];
+    }
+
+    protected function getAccessTokenRequest(array $params): RequestInterface
+    {
+        if ($this->clientCertificatePrivateKey && $this->clientCertificateThumbprint) {
+            $header = [
+                'x5t' => base64_encode(hex2bin($this->clientCertificateThumbprint)),
+            ];
+            $now     = time();
+            $payload = [
+                'aud' => "https://login.microsoftonline.com/{$this->tenant}/oauth2/v2.0/token",
+                'exp' => $now + 360,
+                'iat' => $now,
+                'iss' => $this->clientId,
+                'jti' => bin2hex(random_bytes(20)),
+                'nbf' => $now,
+                'sub' => $this->clientId,
+            ];
+            $jwt = JWT::encode($payload, str_replace('\n', "\n", $this->clientCertificatePrivateKey), 'RS256', null, $header);
+
+            unset($params['client_secret']);
+            $params['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+            $params['client_assertion']      = $jwt;
+        }
+
+        return parent::getAccessTokenRequest($params);
+    }
+
+    protected function getVersionUriInfix($version)
+    {
+        return
+            (self::ENDPOINT_VERSION_2_0 == $version)
+                ? '/v' . self::ENDPOINT_VERSION_2_0
+                : '';
     }
 
     /**

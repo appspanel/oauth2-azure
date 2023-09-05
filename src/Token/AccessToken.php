@@ -14,6 +14,7 @@ class AccessToken extends \League\OAuth2\Client\Token\AccessToken
 
     /**
      * @param Azure $provider
+     * @param array $options
      */
     public function __construct(array $options, $provider)
     {
